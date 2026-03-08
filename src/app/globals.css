@@ -1,26 +1,219 @@
 @import "tailwindcss";
 
+/* ─── Design Tokens ─────────────────────────────────────────────────── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --navy:         #0A0F1E;
+  --navy-800:     #111827;
+  --navy-700:     #1a2236;
+  --navy-600:     #243044;
+  --off-white:    #F5F4F0;
+  --teal:         #00D4B4;
+  --teal-dim:     rgba(0, 212, 180, 0.12);
+  --teal-glow:    rgba(0, 212, 180, 0.08);
+  --amber:        #F5A623;
+  --amber-dim:    rgba(245, 166, 35, 0.12);
+  --red-flag:     #E05252;
+  --red-dim:      rgba(224, 82, 82, 0.12);
+  --green-ok:     #34D399;
+  --green-dim:    rgba(52, 211, 153, 0.12);
+  --border:       rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(255, 255, 255, 0.14);
+  --surface:      rgba(255, 255, 255, 0.04);
+  --surface-2:    rgba(255, 255, 255, 0.07);
 }
 
+/* ─── Tailwind v4 Theme Extension ───────────────────────────────────── */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-navy:       var(--navy);
+  --color-navy-800:   var(--navy-800);
+  --color-navy-700:   var(--navy-700);
+  --color-navy-600:   var(--navy-600);
+  --color-off-white:  var(--off-white);
+  --color-teal:       var(--teal);
+  --color-teal-dim:   var(--teal-dim);
+  --color-amber:      var(--amber);
+  --color-red-flag:   var(--red-flag);
+  --color-green-ok:   var(--green-ok);
+  --color-surface:    var(--surface);
+  --color-surface-2:  var(--surface-2);
+  --color-border:     var(--border);
+  --font-sans:        var(--font-dm-sans);
+  --font-serif:       var(--font-instrument-serif);
+  --font-mono:        var(--font-dm-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ─── Base ──────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 1024px;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--navy);
+  color: var(--off-white);
+  font-family: var(--font-dm-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
+
+/* ─── Typography ────────────────────────────────────────────────────── */
+h1, h2, h3 {
+  font-family: var(--font-instrument-serif), Georgia, serif;
+  letter-spacing: -0.01em;
+}
+
+code, pre, .font-mono {
+  font-family: var(--font-dm-mono), 'Courier New', monospace;
+}
+
+/* ─── Glass Card ────────────────────────────────────────────────────── */
+.glass-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+.glass-card-hover {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255,255,255,0.05);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.glass-card-hover:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-hover);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(0,212,180,0.08), inset 0 1px 0 rgba(255,255,255,0.07);
+}
+
+/* ─── Micro-interactions ────────────────────────────────────────────── */
+button {
+  transition: transform 0.1s ease, box-shadow 0.1s ease, opacity 0.1s ease;
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* ─── Input Styles ──────────────────────────────────────────────────── */
+.input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--off-white);
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.input::placeholder {
+  color: rgba(245, 244, 240, 0.35);
+}
+
+.input:focus {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 3px var(--teal-dim);
+}
+
+/* ─── Light Form Inputs (white bg, black border, black text) ────────── */
+.form-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: #ffffff;
+  border: 1.5px solid #111827;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  color: #111827;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.form-input::placeholder {
+  color: #9ca3af;
+}
+
+.form-input:focus {
+  border-color: #0d9488;
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
+}
+
+/* ─── Teal Button ───────────────────────────────────────────────────── */
+.btn-teal {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: var(--teal);
+  color: var(--navy);
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: filter 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+.btn-teal:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 4px 16px rgba(0, 212, 180, 0.3);
+}
+
+.btn-teal:active {
+  transform: scale(0.97);
+}
+
+/* ─── Pulse animation for logo icon ────────────────────────────────── */
+@keyframes pulse-teal {
+  0%, 100% { opacity: 1; filter: drop-shadow(0 0 4px rgba(0,212,180,0.4)); }
+  50%       { opacity: 0.7; filter: drop-shadow(0 0 8px rgba(0,212,180,0.8)); }
+}
+
+.pulse-teal {
+  animation: pulse-teal 3s ease-in-out infinite;
+}
+
+/* ─── Radix UI Overrides ────────────────────────────────────────────── */
+[data-radix-dialog-overlay] {
+  background: rgba(10, 15, 30, 0.8);
+  backdrop-filter: blur(4px);
+}
+
+[data-radix-select-trigger] {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--off-white);
+  border-radius: 0.5rem;
+}
+
+[data-radix-select-content] {
+  background: var(--navy-700);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+
+[data-radix-tabs-list] {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+}
+
+[data-radix-tabs-trigger][data-state="active"] {
+  background: var(--teal-dim);
+  color: var(--teal);
+  border-bottom: 2px solid var(--teal);
+}
+
+/* ─── Scrollbar ─────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }

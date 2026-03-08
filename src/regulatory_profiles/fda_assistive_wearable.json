@@ -1,0 +1,63 @@
+{
+  "profile_id": "fda_assistive_wearable",
+  "name": "FDA / US — Assistive & Wearable Robotics",
+  "jurisdiction": "fda_us",
+  "device_category": "assistive_wearable",
+  "applicable_standards": [
+    "ISO-13485",
+    "ISO-14971",
+    "IEC-62304",
+    "IEC-62366-1",
+    "21-CFR-820"
+  ],
+  "typical_regulatory_pathway": "510(k) Premarket Notification (Class II)",
+  "device_class_default": "II",
+  "predicate_search_terms": [
+    "powered exoskeleton",
+    "powered orthosis",
+    "wearable robotic system",
+    "assistive robotic device",
+    "lower extremity exoskeleton",
+    "upper extremity orthosis"
+  ],
+  "maude_keywords": [
+    "exoskeleton",
+    "orthosis",
+    "orthotic",
+    "prosthetic",
+    "prosthesis",
+    "wearable robot",
+    "rehabilitation robot",
+    "assistive device",
+    "powered mobility",
+    "exo suit"
+  ],
+  "required_sections": [
+    "device_description",
+    "intended_use",
+    "contraindications",
+    "risk_assessment_overview",
+    "failure_mode_summary",
+    "software_description",
+    "test_summary",
+    "dhf_index"
+  ],
+  "mandatory_review_sections": [
+    "intended_use",
+    "contraindications"
+  ],
+  "key_guidance_documents": [
+    "FDA Guidance: Factors to Consider When Making Benefit-Risk Determinations in Medical Device Premarket Approval",
+    "FDA Guidance: De Novo Classification Process",
+    "FDA Guidance: Software as a Medical Device (SaMD)",
+    "FDA 21 CFR Part 820: Quality System Regulation"
+  ],
+  "risk_classification_framework": "ISO-14971",
+  "software_classification_framework": "IEC-62304",
+  "notes": [
+    "Most powered exoskeletons intended for rehabilitation are classified as Class II (510(k) required)",
+    "Devices for home use by non-clinicians may face additional scrutiny",
+    "Cybersecurity considerations apply if device has wireless connectivity",
+    "Biocompatibility testing required for skin-contact components (ISO 10993)"
+  ]
+}

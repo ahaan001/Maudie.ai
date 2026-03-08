@@ -1,0 +1,13 @@
+{
+  "profile_id": "ce_mdr",
+  "name": "CE / EU — Medical Device Regulation (MDR 2017/745)",
+  "jurisdiction": "ce_eu",
+  "device_category": "all",
+  "status": "stub — not implemented in MVP",
+  "notes": [
+    "CE marking requires conformity with MDR 2017/745",
+    "Classification rules differ from FDA (Annex VIII)",
+    "Technical Documentation and Clinical Evidence required",
+    "This profile is a placeholder for Phase 2 implementation"
+  ]
+}

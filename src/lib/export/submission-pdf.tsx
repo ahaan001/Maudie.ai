@@ -1,0 +1,245 @@
+import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
+
+const styles = StyleSheet.create({
+  page: { fontFamily: 'Helvetica', fontSize: 9, color: '#1a1a1a', padding: '40 50' },
+  coverPage: { alignItems: 'center', justifyContent: 'center', flex: 1 },
+  coverTitle: { fontSize: 24, fontFamily: 'Helvetica-Bold', color: '#0d1b3e', marginBottom: 10 },
+  coverSub: { fontSize: 13, color: '#555', marginBottom: 6 },
+  coverMeta: { fontSize: 10, color: '#888', marginBottom: 4 },
+  coverDivider: { width: 60, height: 2, backgroundColor: '#0d9488', marginVertical: 16 },
+  sectionTitle: { fontSize: 13, fontFamily: 'Helvetica-Bold', color: '#0d1b3e', borderBottom: '1 solid #ddd', paddingBottom: 4, marginBottom: 12, marginTop: 4 },
+  h2: { fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#333', marginBottom: 6, marginTop: 14 },
+  body: { fontSize: 9, color: '#333', lineHeight: 1.6 },
+  note: { fontSize: 8, color: '#888', fontStyle: 'italic', marginBottom: 6 },
+  tocRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3, borderBottom: '1 solid #f0f0f0' },
+  tocTitle: { fontSize: 9, color: '#333' },
+  tocNum: { fontSize: 9, color: '#aaa' },
+  citationRow: { paddingVertical: 3, paddingLeft: 10, borderLeft: '2 solid #e2e8f0', marginBottom: 4 },
+  table: { width: '100%', marginTop: 8 },
+  tableHeader: { flexDirection: 'row', backgroundColor: '#f0f4f8', borderBottom: '1 solid #d0d7e0', paddingVertical: 5 },
+  tableRow: { flexDirection: 'row', borderBottom: '1 solid #eef0f3', paddingVertical: 4 },
+  th: { fontFamily: 'Helvetica-Bold', fontSize: 7, color: '#555', textTransform: 'uppercase', paddingHorizontal: 4 },
+  td: { fontSize: 8, paddingHorizontal: 4, color: '#222' },
+  footer: { position: 'absolute', bottom: 30, left: 50, right: 50, textAlign: 'center', fontSize: 7, color: '#aaa' },
+});
+
+export interface SubmissionSection {
+  sectionType: string;
+  title: string;
+  content: string;
+  confidenceScore: number | null;
+  citations: { documentName: string; textExcerpt: string | null }[];
+}
+
+export interface SubmissionHazard {
+  number: number;
+  description: string;
+  harm: string;
+  riskLevel: string;
+  initialRpr: number | null;
+  residualRpr: number | null;
+  riskStatus: string;
+}
+
+export interface SubmissionAuditEntry {
+  action: string;
+  actorType: string;
+  actorId: string;
+  timestamp: string;
+}
+
+export interface SubmissionPdfProps {
+  project: { name: string; jurisdiction: string; deviceCategory: string };
+  device: { name: string; manufacturerName: string | null; deviceClass: string | null } | null;
+  sections: SubmissionSection[];
+  hazards: SubmissionHazard[];
+  auditSummary: SubmissionAuditEntry[];
+  generatedAt: string;
+}
+
+function rprColor(rpr: number | null): string {
+  if (!rpr) return '#888';
+  if (rpr <= 4) return '#15803d';
+  if (rpr <= 9) return '#b45309';
+  return '#b91c1c';
+}
+
+function jurisdictionLabel(j: string): string {
+  if (j === 'fda_us') return 'FDA 510(k)';
+  if (j === 'ce_eu') return 'CE MDR';
+  return j.toUpperCase();
+}
+
+export function SubmissionPdfDocument({ project, device, sections, hazards, auditSummary, generatedAt }: SubmissionPdfProps) {
+  const date = new Date(generatedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  // Deduplicated citation sources across all sections
+  const allDocNames = Array.from(
+    new Set(sections.flatMap(s => s.citations.map(c => c.documentName)))
+  ).filter(Boolean);
+
+  const RISK_COL = { num: 24, desc: 160, harm: 90, level: 42, irpr: 42, rrpr: 42, status: 48 };
+  const AUDIT_COL = { action: 90, actor: 90, id: 80, ts: 120 };
+
+  return (
+    <Document title={`Submission Package — ${device?.name ?? project.name}`}>
+      {/* ── Cover Page ── */}
+      <Page size="A4" style={styles.page}>
+        <View style={[styles.coverPage, { marginTop: 60 }]}>
+          <Text style={[styles.coverMeta, { fontSize: 9, color: '#0d9488', letterSpacing: 2, textTransform: 'uppercase' }]}>
+            Regulatory Submission Package
+          </Text>
+          <View style={styles.coverDivider} />
+          <Text style={styles.coverTitle}>{device?.name ?? project.name}</Text>
+          {device?.manufacturerName && (
+            <Text style={styles.coverSub}>{device.manufacturerName}</Text>
+          )}
+          <View style={{ marginTop: 20, gap: 4 }}>
+            {device?.deviceClass && (
+              <Text style={styles.coverMeta}>Device Class: {device.deviceClass}</Text>
+            )}
+            <Text style={styles.coverMeta}>Submission Type: {jurisdictionLabel(project.jurisdiction)}</Text>
+            <Text style={styles.coverMeta}>Device Category: {project.deviceCategory.replace(/_/g, ' ')}</Text>
+            <Text style={[styles.coverMeta, { marginTop: 12 }]}>Generated: {date}</Text>
+          </View>
+          <Text style={[styles.coverMeta, { marginTop: 24, fontSize: 8, color: '#bbb' }]}>
+            Generated by Maudie · Compliance-as-a-Service
+          </Text>
+        </View>
+        <Text style={styles.footer} render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`} fixed />
+      </Page>
+
+      {/* ── Table of Contents ── */}
+      <Page size="A4" style={styles.page}>
+        <Text style={styles.sectionTitle}>Table of Contents</Text>
+        {sections.map((s, i) => (
+          <View key={s.sectionType} style={styles.tocRow}>
+            <Text style={styles.tocTitle}>{i + 1}. {s.title}</Text>
+            <Text style={styles.tocNum}>{s.sectionType}</Text>
+          </View>
+        ))}
+        <View style={[styles.tocRow, { marginTop: 8 }]}>
+          <Text style={styles.tocTitle}>{sections.length + 1}. Citations & References</Text>
+        </View>
+        <View style={styles.tocRow}>
+          <Text style={styles.tocTitle}>{sections.length + 2}. Risk Management Summary</Text>
+        </View>
+        <View style={styles.tocRow}>
+          <Text style={styles.tocTitle}>{sections.length + 3}. Audit Trail Summary</Text>
+        </View>
+        <Text style={styles.footer} render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`} fixed />
+      </Page>
+
+      {/* ── Section Pages ── */}
+      {sections.map((s, idx) => (
+        <Page key={s.sectionType} size="A4" style={styles.page}>
+          <Text style={[styles.coverMeta, { fontSize: 7, color: '#aaa', marginBottom: 4 }]}>
+            Section {idx + 1} of {sections.length}
+          </Text>
+          <Text style={styles.sectionTitle}>{s.title}</Text>
+          {s.confidenceScore != null && (
+            <Text style={styles.note}>
+              AI-generated · Confidence: {Math.round(s.confidenceScore * 100)}% · {s.citations.length} citation(s)
+            </Text>
+          )}
+          <Text style={styles.body}>{s.content}</Text>
+          {s.citations.length > 0 && (
+            <View style={{ marginTop: 14 }}>
+              <Text style={styles.h2}>Supporting Evidence</Text>
+              {s.citations.slice(0, 10).map((c, ci) => (
+                <View key={ci} style={styles.citationRow}>
+                  <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: '#555' }}>{c.documentName}</Text>
+                  {c.textExcerpt && (
+                    <Text style={{ fontSize: 7, color: '#888', marginTop: 2 }}>
+                      {c.textExcerpt.slice(0, 200)}{c.textExcerpt.length > 200 ? '…' : ''}
+                    </Text>
+                  )}
+                </View>
+              ))}
+            </View>
+          )}
+          <Text style={styles.footer} render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`} fixed />
+        </Page>
+      ))}
+
+      {/* ── Citations Appendix ── */}
+      <Page size="A4" style={styles.page}>
+        <Text style={styles.sectionTitle}>Citations &amp; References</Text>
+        <Text style={styles.note}>{allDocNames.length} unique source document(s) cited across all sections.</Text>
+        {allDocNames.map((name, i) => (
+          <View key={i} style={[styles.citationRow, { marginBottom: 6 }]}>
+            <Text style={{ fontSize: 9, color: '#333' }}>{i + 1}. {name}</Text>
+          </View>
+        ))}
+        <Text style={styles.footer} render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`} fixed />
+      </Page>
+
+      {/* ── Risk Management Summary ── */}
+      <Page size="A4" orientation="landscape" style={styles.page}>
+        <Text style={styles.sectionTitle}>Risk Management Summary</Text>
+        <View style={styles.table}>
+          <View style={styles.tableHeader}>
+            <Text style={[styles.th, { width: RISK_COL.num }]}>#</Text>
+            <Text style={[styles.th, { width: RISK_COL.desc }]}>Description</Text>
+            <Text style={[styles.th, { width: RISK_COL.harm }]}>Harm</Text>
+            <Text style={[styles.th, { width: RISK_COL.level }]}>Level</Text>
+            <Text style={[styles.th, { width: RISK_COL.irpr }]}>Init RPR</Text>
+            <Text style={[styles.th, { width: RISK_COL.rrpr }]}>Res RPR</Text>
+            <Text style={[styles.th, { width: RISK_COL.status }]}>Status</Text>
+          </View>
+          {hazards.map(h => (
+            <View key={h.number} style={styles.tableRow} wrap={false}>
+              <Text style={[styles.td, { width: RISK_COL.num, color: '#888' }]}>{h.number}</Text>
+              <Text style={[styles.td, { width: RISK_COL.desc }]}>
+                {h.description.length > 80 ? h.description.slice(0, 80) + '…' : h.description}
+              </Text>
+              <Text style={[styles.td, { width: RISK_COL.harm, color: '#555' }]}>{h.harm || '—'}</Text>
+              <Text style={[styles.td, { width: RISK_COL.level, textTransform: 'capitalize', color: h.riskLevel === 'high' ? '#b91c1c' : h.riskLevel === 'medium' ? '#b45309' : '#15803d' }]}>
+                {h.riskLevel}
+              </Text>
+              <Text style={[styles.td, { width: RISK_COL.irpr, fontFamily: 'Helvetica-Bold', color: rprColor(h.initialRpr) }]}>
+                {h.initialRpr ?? '—'}
+              </Text>
+              <Text style={[styles.td, { width: RISK_COL.rrpr, fontFamily: 'Helvetica-Bold', color: rprColor(h.residualRpr) }]}>
+                {h.residualRpr ?? '—'}
+              </Text>
+              <Text style={[styles.td, { width: RISK_COL.status, textTransform: 'capitalize', color: h.riskStatus === 'open' ? '#b91c1c' : '#15803d' }]}>
+                {h.riskStatus}
+              </Text>
+            </View>
+          ))}
+        </View>
+        <Text style={styles.footer} render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`} fixed />
+      </Page>
+
+      {/* ── Audit Trail Summary ── */}
+      <Page size="A4" style={styles.page}>
+        <Text style={styles.sectionTitle}>Audit Trail Summary</Text>
+        <Text style={styles.note}>Last {Math.min(auditSummary.length, 20)} audit entries (most recent first).</Text>
+        <View style={styles.table}>
+          <View style={styles.tableHeader}>
+            <Text style={[styles.th, { width: AUDIT_COL.action }]}>Action</Text>
+            <Text style={[styles.th, { width: AUDIT_COL.actor }]}>Actor Type</Text>
+            <Text style={[styles.th, { width: AUDIT_COL.id }]}>Actor ID</Text>
+            <Text style={[styles.th, { width: AUDIT_COL.ts }]}>Timestamp</Text>
+          </View>
+          {auditSummary.slice(0, 20).map((e, i) => (
+            <View key={i} style={styles.tableRow} wrap={false}>
+              <Text style={[styles.td, { width: AUDIT_COL.action, textTransform: 'capitalize' }]}>
+                {e.action.replace(/_/g, ' ')}
+              </Text>
+              <Text style={[styles.td, { width: AUDIT_COL.actor, textTransform: 'capitalize' }]}>{e.actorType}</Text>
+              <Text style={[styles.td, { width: AUDIT_COL.id, color: '#666' }]}>
+                {e.actorId.length > 12 ? e.actorId.slice(0, 12) + '…' : e.actorId}
+              </Text>
+              <Text style={[styles.td, { width: AUDIT_COL.ts, color: '#888' }]}>
+                {new Date(e.timestamp).toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short' })}
+              </Text>
+            </View>
+          ))}
+        </View>
+        <Text style={styles.footer} render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`} fixed />
+      </Page>
+    </Document>
+  );
+}

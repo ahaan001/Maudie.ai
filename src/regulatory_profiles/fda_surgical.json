@@ -1,0 +1,12 @@
+{
+  "profile_id": "fda_surgical",
+  "name": "FDA / US — Surgical Robotics",
+  "jurisdiction": "fda_us",
+  "device_category": "surgical",
+  "status": "stub — not implemented in MVP",
+  "notes": [
+    "Surgical robots are typically Class III (PMA required)",
+    "De Novo pathway possible for novel surgical systems",
+    "This profile is a placeholder for Phase 2 implementation"
+  ]
+}
