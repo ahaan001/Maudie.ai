@@ -1,3 +1,11 @@
+// pdfjs-dist v4 (used by pdf-parse v2) requires DOMMatrix which doesn't exist in Node.js
+if (typeof (global as Record<string, unknown>).DOMMatrix === 'undefined') {
+  (global as Record<string, unknown>).DOMMatrix = class DOMMatrix {
+    constructor() { return this; }
+    static fromMatrix() { return new (this as unknown as typeof DOMMatrix)(); }
+  };
+}
+
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const pdfParse = require('pdf-parse');
 import { readFile } from 'fs/promises';
