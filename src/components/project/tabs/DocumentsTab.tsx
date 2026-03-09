@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Upload, ChevronDown, ChevronUp, FileText } from 'lucide-react';
 import { useDocuments } from '@/hooks/useDocuments';
@@ -149,9 +149,8 @@ export function DocumentsTab({ projectId }: DocumentsTabProps) {
                 </tr>
               )}
               {(data?.documents ?? []).map(doc => (
-                <>
+                <React.Fragment key={doc.id}>
                   <tr
-                    key={doc.id}
                     className="cursor-pointer"
                     style={{ borderTop: '1px solid var(--border)' }}
                     onClick={() => setExpandedDoc(expandedDoc === doc.id ? null : doc.id)}
@@ -182,13 +181,13 @@ export function DocumentsTab({ projectId }: DocumentsTabProps) {
                     </td>
                   </tr>
                   {expandedDoc === doc.id && (
-                    <tr key={`${doc.id}-chunks`}>
+                    <tr>
                       <td colSpan={6} style={{ background: 'var(--surface)' }}>
                         <ChunkRow projectId={projectId} docId={doc.id} />
                       </td>
                     </tr>
                   )}
-                </>
+                </React.Fragment>
               ))}
             </tbody>
           </table>

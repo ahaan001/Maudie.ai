@@ -22,8 +22,9 @@ export async function GET(req: NextRequest) {
   }
 
   // Check if the email already has an account
+  const inviteEmail = invite.email.trim().toLowerCase();
   const [existingUser] = await db.select({ id: users.id }).from(users)
-    .where(eq(users.email, invite.email)).limit(1);
+    .where(eq(users.email, inviteEmail)).limit(1);
 
   return NextResponse.json({
     email: invite.email,
@@ -66,7 +67,8 @@ export async function POST(req: NextRequest) {
     const role = invite.role as OrgRole;
 
     // Find or create user
-    let [existingUser] = await db.select().from(users).where(eq(users.email, invite.email)).limit(1);
+    const normalizedEmail = invite.email.trim().toLowerCase();
+    let [existingUser] = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1);
 
     if (!existingUser) {
       // New user — name + password required
@@ -75,7 +77,7 @@ export async function POST(req: NextRequest) {
       }
       const [created] = await db.insert(users).values({
         name,
-        email: invite.email,
+        email: normalizedEmail,
         passwordHash: hashPassword(password),
         orgId,
         role,

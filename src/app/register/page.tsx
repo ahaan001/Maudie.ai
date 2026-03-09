@@ -5,7 +5,7 @@ import { signIn } from 'next-auth/react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { MaudieLogo } from '@/components/layout/MaudieLogo';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Info } from 'lucide-react';
 
 type FieldKey = 'name' | 'email' | 'password' | 'orgName';
 
@@ -16,14 +16,16 @@ const FIELD_LABELS: Record<FieldKey, string> = {
   orgName: 'Organization name',
 };
 
-function inputClass(error: boolean): string {
+function inputClass(hasError: boolean): string {
   const base =
     'w-full px-3 py-2 rounded-lg text-sm outline-none transition-all ' +
     'bg-white text-gray-900 placeholder-gray-400 ';
-  return error
+  return hasError
     ? base + 'border border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-100'
     : base + 'border border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-100';
 }
+
+type EmailConflictState = { email: string } | null;
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -35,22 +37,22 @@ export default function RegisterPage() {
   });
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldKey, string>>>({});
   const [globalError, setGlobalError] = useState('');
+  const [emailConflict, setEmailConflict] = useState<EmailConflictState>(null);
   const [loading, setLoading] = useState(false);
 
   function setField(key: FieldKey, value: string) {
     setForm(f => ({ ...f, [key]: value }));
-    // Clear field error as user types
-    if (fieldErrors[key]) {
-      setFieldErrors(e => ({ ...e, [key]: undefined }));
-    }
+    if (fieldErrors[key]) setFieldErrors(e => ({ ...e, [key]: undefined }));
+    if (key === 'email') setEmailConflict(null);
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setGlobalError('');
     setFieldErrors({});
+    setEmailConflict(null);
 
-    // Client-side: catch obviously empty required fields before hitting the network
+    // Client-side validation
     const clientErrors: Partial<Record<FieldKey, string>> = {};
     if (!form.name.trim()) clientErrors.name = 'Full name is required.';
     if (!form.email.trim()) clientErrors.email = 'Email is required.';
@@ -69,19 +71,18 @@ export default function RegisterPage() {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, email: form.email.trim().toLowerCase() }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        // Server returned field-level errors
-        if (data.fieldErrors) {
+        if (res.status === 409) {
+          // Email already exists — surface recovery options
+          setEmailConflict({ email: form.email.trim().toLowerCase() });
+          setFieldErrors({ email: 'An account with this email already exists.' });
+        } else if (data.fieldErrors) {
           setFieldErrors(data.fieldErrors);
-          // If only the email field errored with "already in use", surface a CTA too
-          if (res.status === 409) {
-            setGlobalError('already_in_use');
-          }
         } else {
           setGlobalError(data.error ?? 'Registration failed. Please try again.');
         }
@@ -89,19 +90,17 @@ export default function RegisterPage() {
         return;
       }
 
-      // Registration succeeded — auto sign in
+      // Registration succeeded — auto sign-in
       const result = await signIn('credentials', {
-        email: form.email,
+        email: form.email.trim().toLowerCase(),
         password: form.password,
         redirect: false,
       });
 
-      if (!result?.error) {
-        // Happy path: signed in, go to dashboard
+      if (!result?.error && result?.ok) {
         router.push('/dashboard');
       } else {
-        // Account was created but sign-in failed (e.g. session setup issue).
-        // Redirect to login with a success banner so the user can sign in manually.
+        // Account created but sign-in failed — let them sign in manually with the success banner
         router.push('/login?registered=true');
       }
     } catch {
@@ -110,7 +109,13 @@ export default function RegisterPage() {
     }
   }
 
-  const fields: { key: FieldKey; type: string; autoComplete: string; placeholder: string; hint?: string }[] = [
+  const fields: {
+    key: FieldKey;
+    type: string;
+    autoComplete: string;
+    placeholder: string;
+    hint?: string;
+  }[] = [
     { key: 'name', type: 'text', autoComplete: 'name', placeholder: 'Jane Smith' },
     { key: 'email', type: 'email', autoComplete: 'email', placeholder: 'jane@company.com' },
     {
@@ -120,7 +125,12 @@ export default function RegisterPage() {
       placeholder: 'Min. 8 characters',
       hint: 'At least 8 characters.',
     },
-    { key: 'orgName', type: 'text', autoComplete: 'organization', placeholder: 'e.g., Nexus Robotics, Inc.' },
+    {
+      key: 'orgName',
+      type: 'text',
+      autoComplete: 'organization',
+      placeholder: 'e.g., Nexus Robotics, Inc.',
+    },
   ];
 
   return (
@@ -133,7 +143,8 @@ export default function RegisterPage() {
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-1">Create your account</h2>
           <p className="text-sm text-gray-500 mb-6">
-            You&apos;ll be the <span className="font-medium text-gray-700">Owner</span> of your organization with full access.
+            You&apos;ll be the <span className="font-medium text-gray-700">Owner</span> of your
+            organization with full access.
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4" noValidate>
@@ -151,29 +162,54 @@ export default function RegisterPage() {
                   className={inputClass(!!fieldErrors[key])}
                   placeholder={placeholder}
                   aria-invalid={!!fieldErrors[key]}
-                  aria-describedby={fieldErrors[key] ? `${key}-error` : hint ? `${key}-hint` : undefined}
                 />
                 {fieldErrors[key] ? (
-                  <p id={`${key}-error`} className="mt-1 text-xs text-red-600 flex items-center gap-1">
-                    <AlertCircle className="h-3 w-3 flex-shrink-0" />
-                    {fieldErrors[key]}
-                    {key === 'email' && globalError === 'already_in_use' && (
-                      <>
-                        {' '}
-                        <Link href="/login" className="underline font-medium" style={{ color: '#0d9488' }}>
-                          Sign in instead?
-                        </Link>
-                      </>
-                    )}
+                  <p className="mt-1 text-xs text-red-600 flex items-start gap-1">
+                    <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                    <span>{fieldErrors[key]}</span>
                   </p>
                 ) : hint ? (
-                  <p id={`${key}-hint`} className="mt-1 text-xs text-gray-400">{hint}</p>
+                  <p className="mt-1 text-xs text-gray-400">{hint}</p>
                 ) : null}
               </div>
             ))}
 
-            {globalError && globalError !== 'already_in_use' && (
-              <div className="rounded-lg px-3 py-2.5 text-sm flex items-start gap-2" style={{ background: '#fef2f2', border: '1px solid #fca5a5', color: '#991b1b' }}>
+            {/* Email conflict recovery */}
+            {emailConflict && (
+              <div
+                className="rounded-lg p-3 text-sm space-y-2"
+                style={{ background: '#fffbeb', border: '1px solid #fcd34d' }}
+              >
+                <div className="flex items-start gap-2 text-amber-800">
+                  <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                  <p>
+                    <strong>{emailConflict.email}</strong> is already registered.
+                  </p>
+                </div>
+                <div className="flex gap-2 pl-6">
+                  <Link
+                    href={`/login?email=${encodeURIComponent(emailConflict.email)}`}
+                    className="flex-1 py-1.5 px-3 rounded-md text-xs font-semibold text-center"
+                    style={{ background: '#0d9488', color: '#fff' }}
+                  >
+                    Sign in
+                  </Link>
+                  <Link
+                    href={`/forgot-password?email=${encodeURIComponent(emailConflict.email)}`}
+                    className="flex-1 py-1.5 px-3 rounded-md text-xs font-semibold text-center"
+                    style={{ border: '1px solid #d97706', color: '#92400e' }}
+                  >
+                    Reset password
+                  </Link>
+                </div>
+              </div>
+            )}
+
+            {globalError && (
+              <div
+                className="rounded-lg px-3 py-2.5 text-sm flex items-start gap-2"
+                style={{ background: '#fef2f2', border: '1px solid #fca5a5', color: '#991b1b' }}
+              >
                 <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
                 <span>{globalError}</span>
               </div>

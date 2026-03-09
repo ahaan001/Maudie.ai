@@ -10,7 +10,7 @@ import { FlagsList } from './FlagsList';
 import { DiffViewer } from './DiffViewer';
 import { RiskBadge } from '../shared/RiskBadge';
 import { SkeletonList } from '../shared/SkeletonCard';
-import { hasRole } from '@/lib/auth/permissions';
+import { hasRole } from '@/lib/auth/roles';
 import type { OrgRole } from '@/lib/db/schema';
 
 interface ReviewPanelProps {

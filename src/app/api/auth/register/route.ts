@@ -31,7 +31,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid request', fieldErrors }, { status: 400 });
     }
 
-    const { name, email, password, orgName } = parsed.data;
+    const { name, password, orgName } = parsed.data;
+    const email = parsed.data.email.trim().toLowerCase();
 
     // Check email uniqueness before starting transaction
     const [existing] = await db

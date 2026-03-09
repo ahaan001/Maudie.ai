@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { hasRole } from '@/lib/auth/permissions';
+import { hasRole } from '@/lib/auth/roles';
 import type { OrgRole } from '@/lib/db/schema';
 
 interface Member {

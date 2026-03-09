@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
-import { hasRole } from '@/lib/auth/permissions';
+import { hasRole } from '@/lib/auth/roles';
 import type { OrgRole } from '@/lib/db/schema';
 import { RiskMatrix } from '../risk/RiskMatrix';
 import { RiskSummaryCard } from '../risk/RiskSummaryCard';

@@ -7,7 +7,7 @@ import { Loader2, Sparkles, Eye, RefreshCw, FileText } from 'lucide-react';
 import { useDrafts } from '@/hooks/useDrafts';
 import { useRequirements } from '@/hooks/useRequirements';
 import { useDraftGenerationContext } from '@/contexts/DraftGenerationContext';
-import { hasRole } from '@/lib/auth/permissions';
+import { hasRole } from '@/lib/auth/roles';
 import type { OrgRole } from '@/lib/db/schema';
 import { StatusBadge } from '../shared/StatusBadge';
 import { formatSectionLabel } from '../overview/SectionsChecklist';
