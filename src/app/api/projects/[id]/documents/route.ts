@@ -11,12 +11,29 @@ import { requireProjectSession, hasRole } from '@/lib/auth/permissions';
 const UPLOAD_DIR = process.env.UPLOAD_DIR ?? './uploads';
 const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE_MB ?? '50') * 1024 * 1024;
 
+// All types supported by Apache Tika + plain text formats
 const MIME_TYPES: Record<string, string> = {
+  // PDF
   'application/pdf': 'pdf',
+  // Word
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+  'application/msword': 'doc',
+  // Excel
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+  'application/vnd.ms-excel': 'xls',
+  // PowerPoint
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
+  'application/vnd.ms-powerpoint': 'ppt',
+  // OpenDocument
+  'application/vnd.oasis.opendocument.text': 'odt',
+  'application/vnd.oasis.opendocument.spreadsheet': 'ods',
+  // Rich Text
+  'application/rtf': 'rtf',
+  // Plain text
   'text/plain': 'txt',
   'text/markdown': 'md',
   'text/csv': 'csv',
+  'text/html': 'html',
 };
 
 export async function GET(

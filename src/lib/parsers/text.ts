@@ -24,14 +24,12 @@ export function parseTextContent(content: string, mimeType?: string): ParsedDocu
 }
 
 export async function parseFile(filePath: string, mimeType: string): Promise<ParsedDocument> {
-  const { parsePdf } = await import('./pdf');
-  const { parseDocx } = await import('./docx');
-
-  if (mimeType === 'application/pdf') {
-    return parsePdf(filePath);
-  } else if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-    return parseDocx(filePath);
-  } else {
+  // Plain text formats are read directly — no need for Tika overhead
+  if (mimeType.startsWith('text/')) {
     return parseText(filePath, mimeType);
   }
+
+  // All binary formats (PDF, DOCX, XLSX, PPTX, DOC, RTF, HTML, etc.) go through Tika
+  const { parseWithTika } = await import('./tika');
+  return parseWithTika(filePath);
 }

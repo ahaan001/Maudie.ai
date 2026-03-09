@@ -33,6 +33,13 @@ services:
     #           count: all
     #           capabilities: [gpu]
 
+  tika:
+    image: apache/tika:2.9.2.1
+    container_name: compliance_tika
+    ports:
+      - "127.0.0.1:9998:9998"
+    restart: unless-stopped
+
   redis:
     image: redis:7-alpine
     container_name: compliance_redis
