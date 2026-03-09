@@ -1,13 +1,10 @@
-// pdfjs-dist v4 (used by pdf-parse v2) requires DOMMatrix which doesn't exist in Node.js
-if (typeof (global as Record<string, unknown>).DOMMatrix === 'undefined') {
-  (global as Record<string, unknown>).DOMMatrix = class DOMMatrix {
-    constructor() { return this; }
-    static fromMatrix() { return new (this as unknown as typeof DOMMatrix)(); }
-  };
-}
-
+// Import from the library path directly — avoids pdf-parse v1's test-runner side effect
+// which tries to open a non-existent fixture file when requiring the main index.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const pdfParse = require('pdf-parse');
+const _pdfParseModule = require('pdf-parse/lib/pdf-parse.js');
+// Turbopack wraps CJS modules — unwrap if needed
+const pdfParse: (buf: Buffer) => Promise<{ text: string; numpages: number; info: Record<string, string> }> =
+  typeof _pdfParseModule === 'function' ? _pdfParseModule : _pdfParseModule.default;
 import { readFile } from 'fs/promises';
 
 export interface ParsedDocument {

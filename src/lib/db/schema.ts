@@ -9,16 +9,7 @@ import {
   real,
   index,
   uniqueIndex,
-  customType,
 } from 'drizzle-orm/pg-core';
-
-// pgvector custom type — schema reflects post-migration state.
-// Run src/scripts/migrate-pgvector.ts to ALTER the DB column.
-const pgVector = customType<{ data: number[]; driverData: string }>({
-  dataType() { return 'vector(768)'; },
-  fromDriver(v: string): number[] { return JSON.parse(v); },
-  toDriver(v: number[]): string { return `[${v.join(',')}]`; },
-});
 import { sql, relations } from 'drizzle-orm';
 
 // ─── Users & Auth ─────────────────────────────────────────────────────────────
@@ -127,8 +118,8 @@ export const chunks = pgTable('chunks', {
   documentId: uuid('document_id').notNull(),
   projectId: uuid('project_id').notNull(),
   content: text('content').notNull(),
-  // pgvector vector(768) column — stores nomic-embed-text embeddings (768 dims)
-  embedding: pgVector('embedding'),
+  // Embedding stored as JSONB array (nomic-embed-text 768-dim vectors)
+  embedding: jsonb('embedding'),
   tokenCount: integer('token_count').notNull(),
   chunkIndex: integer('chunk_index').notNull(),
   superseded: boolean('superseded').notNull().default(false),

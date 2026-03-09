@@ -23,13 +23,33 @@ export function parseTextContent(content: string, mimeType?: string): ParsedDocu
   };
 }
 
+const PDF_TYPES = new Set(['application/pdf']);
+const DOCX_TYPES = new Set([
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/msword',
+]);
+
 export async function parseFile(filePath: string, mimeType: string): Promise<ParsedDocument> {
-  // Plain text formats are read directly — no need for Tika overhead
+  // Plain text formats are read directly
   if (mimeType.startsWith('text/')) {
     return parseText(filePath, mimeType);
   }
 
-  // All binary formats (PDF, DOCX, XLSX, PPTX, DOC, RTF, HTML, etc.) go through Tika
-  const { parseWithTika } = await import('./tika');
-  return parseWithTika(filePath);
+  // PDF — use local pdf-parse (no external service required)
+  if (PDF_TYPES.has(mimeType)) {
+    const { parsePdf } = await import('./pdf');
+    const result = await parsePdf(filePath);
+    return { text: result.text, pageCount: result.pageCount, metadata: result.metadata };
+  }
+
+  // DOCX / DOC — use local mammoth (no external service required)
+  if (DOCX_TYPES.has(mimeType)) {
+    const { parseDocx } = await import('./docx');
+    return parseDocx(filePath);
+  }
+
+  // All other binary formats (xlsx, pptx, odt, rtf, etc.) are not yet supported
+  throw new Error(
+    `File format "${mimeType}" is not supported for ingestion. Supported formats: PDF, DOCX, DOC, and plain text (TXT, MD, CSV, HTML).`
+  );
 }

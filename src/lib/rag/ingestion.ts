@@ -70,12 +70,12 @@ export async function ingestDocument(documentId: string): Promise<IngestionResul
       for (const chunk of embeddedChunks) {
         await client.query(`
           INSERT INTO chunks (document_id, project_id, content, embedding, token_count, chunk_index, metadata)
-          VALUES ($1, $2, $3, $4::vector, $5, $6, $7)
+          VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7)
         `, [
           documentId,
           doc.projectId,
           chunk.content,
-          `[${chunk.embedding.join(',')}]`,
+          JSON.stringify(chunk.embedding),
           chunk.tokenCount,
           chunk.chunkIndex,
           JSON.stringify(chunk.metadata),
