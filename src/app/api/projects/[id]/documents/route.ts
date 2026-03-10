@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db/client';
 import { documents } from '@/lib/db/schema';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and } from 'drizzle-orm';
 import { hashFile } from '@/lib/utils/hash';
 import { enqueueJob, QUEUES } from '@/lib/queue/boss';
 import { writeFile, mkdir } from 'fs/promises';
@@ -76,6 +76,23 @@ export async function POST(
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const fileHash = hashFile(buffer);
+
+    // Reject duplicate — same file content already exists in this project
+    const [existing] = await db.select({ id: documents.id, name: documents.name })
+      .from(documents)
+      .where(and(
+        eq(documents.projectId, id as `${string}-${string}-${string}-${string}-${string}`),
+        eq(documents.fileHash, fileHash),
+        eq(documents.superseded, false),
+      ))
+      .limit(1);
+
+    if (existing) {
+      return NextResponse.json(
+        { error: 'duplicate', document: { id: existing.id, name: existing.name } },
+        { status: 409 }
+      );
+    }
 
     // Save file to disk
     const projectDir = join(UPLOAD_DIR, id);

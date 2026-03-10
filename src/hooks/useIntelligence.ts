@@ -27,11 +27,11 @@ export interface IntelligenceData {
   riskInputs: unknown[];
 }
 
-export function useIntelligence(projectId: string, isRunning: boolean) {
+export function useIntelligence(projectId: string, shouldPoll: boolean) {
   return useQuery<IntelligenceData>({
     queryKey: ['intelligence', projectId],
     queryFn: () => fetch(`/api/projects/${projectId}/intelligence`).then(r => r.json()),
-    refetchInterval: isRunning ? 5_000 : false,
+    refetchInterval: shouldPoll ? 3_000 : false,
     staleTime: 15_000,
   });
 }

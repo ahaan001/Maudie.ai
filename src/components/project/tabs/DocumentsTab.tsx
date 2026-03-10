@@ -2,7 +2,7 @@
 
 import React, { useState, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Upload, ChevronDown, ChevronUp, FileText } from 'lucide-react';
+import { Upload, ChevronDown, ChevronUp, FileText, Pencil, Trash2, Check, X } from 'lucide-react';
 import { useDocuments } from '@/hooks/useDocuments';
 import { useChunks } from '@/hooks/useChunks';
 import { StatusBadge } from '../shared/StatusBadge';
@@ -63,7 +63,18 @@ export function DocumentsTab({ projectId }: DocumentsTabProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState('');
+  const [duplicateName, setDuplicateName] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Delete state
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  // Rename state
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [renameLoading, setRenameLoading] = useState(false);
+  const renameInputRef = useRef<HTMLInputElement>(null);
 
   async function uploadFile(file: File) {
     setUploading(true);
@@ -72,6 +83,14 @@ export function DocumentsTab({ projectId }: DocumentsTabProps) {
       const form = new FormData();
       form.append('file', file);
       const res = await fetch(`/api/projects/${projectId}/documents`, { method: 'POST', body: form });
+
+      if (res.status === 409) {
+        const body = await res.json();
+        setDuplicateName(body.document?.name ?? file.name);
+        setUploadMsg('');
+        return;
+      }
+
       if (!res.ok) throw new Error(await res.text());
       setUploadMsg(`${file.name} uploaded.`);
       queryClient.invalidateQueries({ queryKey: ['documents', projectId] });
@@ -88,6 +107,54 @@ export function DocumentsTab({ projectId }: DocumentsTabProps) {
     const file = e.dataTransfer.files[0];
     if (file) uploadFile(file);
   }
+
+  async function deleteDocument(docId: string) {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/documents/${docId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(await res.text());
+      queryClient.invalidateQueries({ queryKey: ['documents', projectId] });
+      if (expandedDoc === docId) setExpandedDoc(null);
+    } catch (e) {
+      console.error('Delete failed:', e);
+    } finally {
+      setDeleting(false);
+      setDeleteConfirmId(null);
+    }
+  }
+
+  function startRename(docId: string, currentName: string) {
+    setRenamingId(docId);
+    setRenameValue(currentName);
+    setTimeout(() => renameInputRef.current?.select(), 0);
+  }
+
+  async function commitRename(docId: string) {
+    const trimmed = renameValue.trim();
+    if (!trimmed) { setRenamingId(null); return; }
+    setRenameLoading(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/documents/${docId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimmed }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      queryClient.invalidateQueries({ queryKey: ['documents', projectId] });
+    } catch (e) {
+      console.error('Rename failed:', e);
+    } finally {
+      setRenameLoading(false);
+      setRenamingId(null);
+    }
+  }
+
+  function cancelRename() {
+    setRenamingId(null);
+    setRenameValue('');
+  }
+
+  const deleteTarget = data?.documents?.find(d => d.id === deleteConfirmId);
 
   return (
     <div className="space-y-6">
@@ -125,6 +192,82 @@ export function DocumentsTab({ projectId }: DocumentsTabProps) {
         <p className="text-xs" style={{ color: 'var(--teal)' }}>{uploadMsg}</p>
       )}
 
+      {/* Duplicate document popup */}
+      {duplicateName && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ background: 'rgba(0,0,0,0.6)' }}
+          onClick={() => setDuplicateName(null)}
+        >
+          <div
+            className="rounded-xl p-6 max-w-sm w-full mx-4 space-y-4"
+            style={{ background: 'var(--navy-900, #0d1117)', border: '1px solid var(--border)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3">
+              <span className="text-xl">⚠️</span>
+              <div>
+                <p className="text-sm font-semibold" style={{ color: 'var(--off-white)' }}>
+                  Document already exists
+                </p>
+                <p className="text-xs mt-1" style={{ color: 'rgba(245,244,240,0.5)' }}>
+                  <span style={{ color: 'var(--off-white)' }}>{duplicateName}</span> has already been uploaded to this project. Duplicates are not allowed.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setDuplicateName(null)}
+              className="w-full rounded-lg py-2 text-sm font-medium transition-opacity hover:opacity-80"
+              style={{ background: 'var(--teal)', color: '#0d1117' }}
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirmation modal */}
+      {deleteConfirmId && deleteTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ background: 'rgba(0,0,0,0.6)' }}
+          onClick={() => setDeleteConfirmId(null)}
+        >
+          <div
+            className="rounded-xl p-6 max-w-sm w-full mx-4 space-y-4"
+            style={{ background: 'var(--navy-900, #0d1117)', border: '1px solid var(--border)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3">
+              <Trash2 className="h-5 w-5 flex-shrink-0 mt-0.5" style={{ color: 'var(--red-flag)' }} />
+              <div>
+                <p className="text-sm font-semibold" style={{ color: 'var(--off-white)' }}>Delete document?</p>
+                <p className="text-xs mt-1" style={{ color: 'rgba(245,244,240,0.5)' }}>
+                  <span style={{ color: 'var(--off-white)' }}>{deleteTarget.name}</span> and all its chunks and citations will be permanently removed. This cannot be undone.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setDeleteConfirmId(null)}
+                className="flex-1 rounded-lg py-2 text-sm font-medium transition-opacity hover:opacity-80"
+                style={{ background: 'var(--surface-2)', color: 'rgba(245,244,240,0.6)' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => deleteDocument(deleteConfirmId)}
+                disabled={deleting}
+                className="flex-1 rounded-lg py-2 text-sm font-medium transition-opacity hover:opacity-80 disabled:opacity-50"
+                style={{ background: 'var(--red-flag)', color: '#fff' }}
+              >
+                {deleting ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* File Table */}
       {isLoading ? (
         <SkeletonList count={4} variant="row" />
@@ -151,16 +294,59 @@ export function DocumentsTab({ projectId }: DocumentsTabProps) {
               {(data?.documents ?? []).map(doc => (
                 <React.Fragment key={doc.id}>
                   <tr
-                    className="cursor-pointer"
+                    className="group cursor-pointer"
                     style={{ borderTop: '1px solid var(--border)' }}
-                    onClick={() => setExpandedDoc(expandedDoc === doc.id ? null : doc.id)}
+                    onClick={() => {
+                      if (renamingId === doc.id) return;
+                      setExpandedDoc(expandedDoc === doc.id ? null : doc.id);
+                    }}
                   >
+                    {/* Name cell — switches to inline input when renaming */}
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 flex-shrink-0" style={{ color: 'rgba(245,244,240,0.3)' }} />
-                        <span className="text-xs font-medium truncate max-w-48" style={{ color: 'var(--off-white)' }}>{doc.name}</span>
-                      </div>
+                      {renamingId === doc.id ? (
+                        <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                          <input
+                            ref={renameInputRef}
+                            value={renameValue}
+                            onChange={e => setRenameValue(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') commitRename(doc.id);
+                              if (e.key === 'Escape') cancelRename();
+                            }}
+                            disabled={renameLoading}
+                            autoFocus
+                            className="rounded px-2 py-0.5 text-xs font-medium flex-1 min-w-0 outline-none"
+                            style={{
+                              background: 'var(--surface-2)',
+                              border: '1px solid var(--teal)',
+                              color: 'var(--off-white)',
+                              maxWidth: '180px',
+                            }}
+                          />
+                          <button
+                            onClick={() => commitRename(doc.id)}
+                            disabled={renameLoading}
+                            className="p-0.5 rounded hover:opacity-80 disabled:opacity-40"
+                            title="Save"
+                          >
+                            <Check className="h-3.5 w-3.5" style={{ color: 'var(--teal)' }} />
+                          </button>
+                          <button
+                            onClick={cancelRename}
+                            className="p-0.5 rounded hover:opacity-80"
+                            title="Cancel"
+                          >
+                            <X className="h-3.5 w-3.5" style={{ color: 'rgba(245,244,240,0.4)' }} />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4 flex-shrink-0" style={{ color: 'rgba(245,244,240,0.3)' }} />
+                          <span className="text-xs font-medium truncate max-w-48" style={{ color: 'var(--off-white)' }}>{doc.name}</span>
+                        </div>
+                      )}
                     </td>
+
                     <td className="px-4 py-3 text-xs" style={{ color: 'rgba(245,244,240,0.5)' }}>
                       {doc.mimeType?.split('/')[1]?.toUpperCase() ?? '—'}
                     </td>
@@ -173,13 +359,36 @@ export function DocumentsTab({ projectId }: DocumentsTabProps) {
                     <td className="px-4 py-3">
                       <StatusBadge status={doc.ingestionStatus} size="xs" />
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      {expandedDoc === doc.id
-                        ? <ChevronUp className="h-4 w-4 inline" style={{ color: 'rgba(245,244,240,0.3)' }} />
-                        : <ChevronDown className="h-4 w-4 inline" style={{ color: 'rgba(245,244,240,0.3)' }} />
-                      }
+
+                    {/* Actions + chevron */}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-2">
+                        {renamingId !== doc.id && (
+                          <>
+                            <button
+                              onClick={e => { e.stopPropagation(); startRename(doc.id, doc.name); }}
+                              className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-white/5"
+                              title="Rename"
+                            >
+                              <Pencil className="h-3.5 w-3.5" style={{ color: 'rgba(245,244,240,0.45)' }} />
+                            </button>
+                            <button
+                              onClick={e => { e.stopPropagation(); setDeleteConfirmId(doc.id); }}
+                              className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-white/5"
+                              title="Delete"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" style={{ color: 'var(--red-flag)' }} />
+                            </button>
+                          </>
+                        )}
+                        {expandedDoc === doc.id
+                          ? <ChevronUp className="h-4 w-4" style={{ color: 'rgba(245,244,240,0.3)' }} />
+                          : <ChevronDown className="h-4 w-4" style={{ color: 'rgba(245,244,240,0.3)' }} />
+                        }
+                      </div>
                     </td>
                   </tr>
+
                   {expandedDoc === doc.id && (
                     <tr>
                       <td colSpan={6} style={{ background: 'var(--surface)' }}>

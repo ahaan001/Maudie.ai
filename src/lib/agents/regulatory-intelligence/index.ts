@@ -1,4 +1,4 @@
-import { generate } from '../../ollama/client';
+import { generate, checkOllamaHealth } from '../../ollama/client';
 import { db, pool } from '../../db/client';
 import { failureClusters, hazards, riskInputs, agentRuns } from '../../db/schema';
 import { logAudit } from '../../audit/logger';
@@ -42,6 +42,24 @@ export interface RegulatoryAnalysisResult {
 export async function runRegulatoryIntelligenceAgent(job: MaudeAnalysisJob): Promise<RegulatoryAnalysisResult> {
   const runStart = Date.now();
 
+  // Fail fast if Ollama is unreachable — surface error in UI rather than hanging
+  const ollamaHealth = await checkOllamaHealth();
+  if (!ollamaHealth.healthy) {
+    const ollamaUrl = process.env.OLLAMA_URL ?? 'http://localhost:11434';
+    const [failedRun] = await db.insert(agentRuns).values({
+      projectId: job.projectId,
+      agentName: 'RegulatoryIntelligenceAgent',
+      jobType: 'analyze_maude',
+      status: 'failed',
+      input: job as unknown as Record<string, unknown>,
+      modelUsed: process.env.OLLAMA_MODEL ?? 'mistral:7b-instruct',
+      error: `Ollama unavailable at ${ollamaUrl}. Start Ollama and ensure the model is pulled.`,
+      durationMs: Date.now() - runStart,
+      completedAt: new Date(),
+    }).returning({ id: agentRuns.id });
+    return { clusterCount: 0, hazardCount: 0, riskInputCount: 0, agentRunId: failedRun.id };
+  }
+
   const [run] = await db.insert(agentRuns).values({
     projectId: job.projectId,
     agentName: 'RegulatoryIntelligenceAgent',
@@ -74,52 +92,53 @@ export async function runRegulatoryIntelligenceAgent(job: MaudeAnalysisJob): Pro
       client.release();
     }
 
-    if (events.length === 0) {
-      await db.update(agentRuns).set({
-        status: 'completed',
-        output: { message: 'No MAUDE events found for keywords', clusterCount: 0 } as Record<string, unknown>,
-        durationMs: Date.now() - runStart,
-        completedAt: new Date(),
-      }).where(eq(agentRuns.id, run.id));
+    // No real MAUDE data — generate synthetic clusters from Ollama using device category knowledge
+    const usingRealEvents = events.length > 0;
 
-      return { clusterCount: 0, hazardCount: 0, riskInputCount: 0, agentRunId: run.id };
-    }
+    let clusterPrompt: string;
+    let inputTokens = 0;
+    let outputTokens = 0;
+    let response = '';
 
-    // Summarize events for LLM (batch in groups of 10 to manage tokens)
-    const eventSummaries: string[] = [];
-    const batchSize = 10;
+    if (usingRealEvents) {
+      // Summarize events for LLM (batch in groups of 10 to manage tokens)
+      const eventSummaries: string[] = [];
+      const batchSize = 10;
 
-    for (let i = 0; i < events.length; i += batchSize) {
-      const batch = events.slice(i, i + batchSize);
-      const batchText = batch.map((e, j) =>
-        `Event ${i + j + 1}: Device: ${e.device_name ?? 'unknown'} | Type: ${e.event_type ?? 'unknown'} | Report: ${e.report_text ?? 'no text'}`
-      ).join('\n\n');
+      for (let i = 0; i < events.length; i += batchSize) {
+        const batch = events.slice(i, i + batchSize);
+        const batchText = batch.map((e, j) =>
+          `Event ${i + j + 1}: Device: ${e.device_name ?? 'unknown'} | Type: ${e.event_type ?? 'unknown'} | Report: ${e.report_text ?? 'no text'}`
+        ).join('\n\n');
 
-      if (batch.length <= 5) {
-        // Small batch: just use text directly
-        eventSummaries.push(batchText);
-      } else {
-        // Summarize larger batch to save tokens
-        const sumResult = await generate({
-          system: 'Summarize these medical device adverse events into key failure patterns. Be concise.',
-          prompt: batchText,
-          temperature: 0.1,
-          num_predict: 800,
-        });
-        eventSummaries.push(sumResult.response);
+        if (batch.length <= 5) {
+          eventSummaries.push(batchText);
+        } else {
+          const sumResult = await generate({
+            system: 'Summarize these medical device adverse events into key failure patterns. Be concise.',
+            prompt: batchText,
+            temperature: 0.1,
+            num_predict: 800,
+          });
+          eventSummaries.push(sumResult.response);
+        }
       }
-    }
 
-    const combinedSummaries = eventSummaries.join('\n\n---\n\n');
+      const combinedSummaries = eventSummaries.join('\n\n---\n\n');
+      clusterPrompt = `Analyze these FDA MAUDE adverse event summaries for ${job.deviceCategory} devices:\n\n${combinedSummaries}\n\nIdentify failure clusters and generate risk inputs. Output JSON.`;
+    } else {
+      // No real events — generate representative synthetic clusters from general device-category knowledge
+      clusterPrompt = `No FDA MAUDE event records were found in the database for this query. Using your knowledge of historical FDA MAUDE adverse event patterns for "${job.deviceCategory}" devices (such as exoskeletons, orthoses, prosthetics, and wearable robotic assistive devices), identify the 3-5 most commonly reported failure clusters. Base your analysis on well-known failure patterns in this device category. Mark each cluster's representative_events with the prefix "[SYNTHETIC]" to indicate these are knowledge-based rather than from live FDA records. Output JSON.`;
+    }
 
     // Cluster analysis
-    const { response, inputTokens, outputTokens } = await generate({
+    ({ response, inputTokens, outputTokens } = await generate({
       system: CLUSTER_SYSTEM_PROMPT,
-      prompt: `Analyze these FDA MAUDE adverse event summaries for ${job.deviceCategory} devices:\n\n${combinedSummaries}\n\nIdentify failure clusters and generate risk inputs. Output JSON.`,
+      prompt: clusterPrompt,
       format: 'json',
       temperature: 0.15,
       num_predict: 2000,
-    });
+    }));
 
     let analysis: {
       clusters: Array<{
@@ -190,7 +209,7 @@ export async function runRegulatoryIntelligenceAgent(job: MaudeAnalysisJob): Pro
 
     await db.update(agentRuns).set({
       status: 'completed',
-      output: { clusterCount, hazardCount, riskInputCount, eventsAnalyzed: events.length } as Record<string, unknown>,
+      output: { clusterCount, hazardCount, riskInputCount, eventsAnalyzed: events.length, synthetic: !usingRealEvents } as Record<string, unknown>,
       inputTokens,
       outputTokens,
       durationMs: Date.now() - runStart,
